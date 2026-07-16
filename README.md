@@ -1,98 +1,88 @@
-# 🚀 Secure Deployment of Three-Tier MERN Architecture on Kubernetes
+# 🚀 Three-Tier MERN App on Kubernetes (Kind Cluster) with StatefulSets & Persistent Storage
 
-A production-style deployment of a **MERN (MongoDB, Express, React, Node.js)** application on a **Kubernetes cluster (KIND)**, using isolated namespaces, Kubernetes Secrets, and separate Deployments/Services for each tier — built as a real-world DevOps use case for a fintech-style SaaS platform.
+A beginner-friendly, step-by-step guide to deploying a **Frontend + Backend + MongoDB** application on Kubernetes — simulating how a real DevOps engineer sets up a production-style app in a startup.
 
----
-
-## 📌 Project Overview
-
-This project demonstrates how a DevOps Engineer sets up, secures, and deploys a three-tier application on Kubernetes:
-
-- **Frontend** → React app (Stateless)
-- **Backend** → Node.js/Express API (Stateless)
-- **Database** → MongoDB Atlas (Stateful, external managed DB)
-
-Each tier runs in its **own Kubernetes namespace** for isolation, organization, and security — following industry best practices used by real startups scaling from proof-of-concept to production.
+> 📌 Even if you're new to Kubernetes, follow this README top-to-bottom and you'll have the full app running.
 
 ---
 
-## 🏗 Architecture
+## 🎯 What This Project Does
 
-```
-                 ┌─────────────────────┐
-                 │      Frontend        │
-                 │  (Namespace: frontend)│
-                 │  React App - NodePort │
-                 └──────────┬───────────┘
-                             │
-                 ┌───────────▼───────────┐
-                 │       Backend          │
-                 │ (Namespace: backend)   │
-                 │ Node.js API - ClusterIP│
-                 └──────────┬───────────┘
-                             │
-                 ┌───────────▼───────────┐
-                 │      MongoDB Atlas     │
-                 │ (External Managed DB)  │
-                 └────────────────────────┘
-```
+We deploy a **3-tier application**:
+
+| Layer | Technology | Kubernetes Object |
+|---|---|---|
+| Frontend | React | Deployment |
+| Backend | Node.js + Express | Deployment |
+| Database | MongoDB | **StatefulSet** |
+
+We also set up:
+- **Namespaces** — to keep frontend, backend, and database organized separately.
+- **Persistent Storage** — so MongoDB data is NOT lost when a pod restarts.
+- **Resource Quotas & Limit Ranges** — so no single app eats up all the server resources.
+- **Health Checks (Probes)** — so Kubernetes automatically restarts broken pods.
+
+---
+
+## 🧠 First, Understand These Concepts (in Simple Words)
+
+| Term | Simple Meaning |
+|---|---|
+| **StorageClass** | A "template" that tells Kubernetes what type of storage to use (disk, cloud, etc.) |
+| **PersistentVolume (PV)** | The actual storage space on the machine |
+| **PersistentVolumeClaim (PVC)** | A "request" made by an app asking for storage |
+| **Deployment** | Used for apps that don't store data themselves (frontend, backend) |
+| **StatefulSet** | Used for apps that need to remember data & keep the same identity (like MongoDB) |
+| **Headless Service** | Gives each database pod its own fixed address (like `mongo-0`, `mongo-1`) |
+| **ReplicaSet** | A group of database servers holding the same data, so if one dies, another takes over |
+
+### 🔑 Why does MongoDB need extra steps (StatefulSet + Init Job)?
+
+Think of it like starting a car:
+
+1. **StatefulSet** = installing the engine (MongoDB server starts with storage, ready to be part of a team).
+2. **Init Job** = turning the key (it actually creates/activates the replica set using `rs.initiate()`).
+
+Without step 2, MongoDB is running but NOT properly configured — some features like transactions won't work.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-three-tier-app/
-├── k8s-manifests/
-│   ├── namespaces/
-│   │   ├── frontend.yaml
-│   │   ├── backend.yaml
-│   │   └── database.yaml
-│   │
-│   ├── frontend/
-│   │   ├── deployment.yaml
-│   │   └── service.yaml
-│   │
-│   ├── backend/
-│   │   ├── deployment.yaml
-│   │   └── service.yaml
-│   │
-│   └── database/
-│       └── mongo-secret.yaml
-│
-├── frontend/                 # React source code
-├── backend/                  # Node.js source code
-│
-└── kind-cluster/
-    └── kind-config.yaml       # KIND cluster config
+three-tier-k8s/
+├── namespaces/
+│   ├── frontend.yaml
+│   ├── backend.yaml
+│   └── database.yaml
+├── resource-quotas/
+├── limit-ranges/
+├── frontend/
+│   ├── deployment.yaml
+│   └── service.yaml
+├── backend/
+│   ├── deployment.yaml
+│   └── service.yaml
+├── database/
+│   ├── statefulset.yaml
+│   ├── service.yaml
+│   └── mongo-init-job.yaml
+├── storage/
+│   ├── storageclass.yaml
+│   ├── mongo-pv.yaml
+│   └── mongo-pvc.yaml      # optional, only needed if using Deployment (not StatefulSet)
+└── kind-config.yaml
 ```
 
 ---
 
-## 🛠 Tech Stack
+## 🛠️ Step 1 — Set Up Your Server (AWS EC2)
 
-- **Frontend:** React.js
-- **Backend:** Node.js, Express.js
-- **Database:** MongoDB Atlas
-- **Container Orchestration:** Kubernetes (KIND)
-- **Containerization:** Docker
-- **Cloud:** AWS EC2 (Ubuntu 22.04)
-- **Security:** Kubernetes Secrets, Namespace isolation
+We'll use an EC2 instance as our base machine.
 
----
-
-## ⚙️ Step-by-Step Setup
-
-### 1️⃣ Launch EC2 Instance
-- AMI: Ubuntu 22.04 LTS
-- Instance type: `t2.medium` (2 vCPU, 4GB RAM)
-- Security Group: allow ports `22`, `80`, `443`, `3000`, `30007`
-
-```bash
-ssh -i your-key.pem ubuntu@your-ec2-public-ip
-```
-
-### 2️⃣ Install Docker
+1. Launch an EC2 instance (Ubuntu recommended).
+2. SSH into it.
+3. Install Docker:
 
 ```bash
 sudo apt update && sudo apt upgrade -y
@@ -104,27 +94,40 @@ newgrp docker
 docker --version
 ```
 
-### 3️⃣ Install kubectl
+---
+
+## 🛠️ Step 2 — Install `kubectl` and `kind`
 
 ```bash
+# Install kubectl
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 chmod +x kubectl
 sudo mv kubectl /usr/local/bin/kubectl
 kubectl version --client
-```
 
-### 4️⃣ Install KIND
-
-```bash
+# Install kind
 curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
 chmod +x ./kind
 sudo mv ./kind /usr/local/bin/kind
 kind version
 ```
 
-### 5️⃣ Create KIND Cluster
+---
 
-`kind-config.yaml`:
+## 🛠️ Step 3 — Prepare Storage Folder on EC2
+
+Before creating the cluster, make a folder on your EC2 machine where MongoDB data will actually live:
+
+```bash
+sudo mkdir -p /mnt/kind-storage/mongo
+sudo chmod 777 /mnt/kind-storage/mongo
+```
+
+---
+
+## 🛠️ Step 4 — Create the Kind Cluster
+
+Save this as `kind-config.yaml`:
 
 ```yaml
 kind: Cluster
@@ -139,7 +142,7 @@ nodes:
       - containerPort: 443
         hostPort: 443
         protocol: TCP
-      - containerPort: 30007
+      - containerPort: 30007   # Frontend NodePort
         hostPort: 30007
         protocol: TCP
   - role: worker
@@ -148,94 +151,160 @@ nodes:
     image: kindest/node:v1.28.0
 ```
 
-```bash
-kind create cluster --config kind-config.yaml --name three-tier-cluster
-kubectl cluster-info --context kind-three-tier-cluster
-kubectl get nodes
-```
-
-
-```
-
-### 7️⃣ Create Namespaces
+Create the cluster:
 
 ```bash
-kubectl create namespace frontend
-kubectl create namespace backend
-kubectl create namespace database
-```
-
-### 8️⃣ Create MongoDB Secret
-
-```bash
-kubectl -n backend create secret generic mongo-secret --from-env-file=.env
-kubectl -n backend get secret mongo-secret -o yaml
-```
-
-### 9️⃣ Apply Kubernetes Manifests
-
-```bash
-kubectl apply -f k8s-manifests --recursive
-```
-
-### 🔎 Verify Deployment
-
-```bash
-kubectl get pods -n frontend
-kubectl get pods -n backend
-kubectl get svc -n frontend
-kubectl get svc -n backend
-```
-
-### 🌐 Access the Application
-
-```bash
-kubectl port-forward svc/frontend-service 3000:80 -n frontend --address 0.0.0.0
-```
-
-Open in browser:
-```
-http://<EC2_PUBLIC_IP>:3000
+kind create cluster --name three-tier-cluster --config kind-config.yaml
 ```
 
 ---
 
-## 🔐 Security Practices Used
+## 🛠️ Step 5 — Create Namespaces
 
-- Database credentials stored in **Kubernetes Secrets** (not hardcoded)
-- **Namespace isolation** between frontend, backend, and database
-- **ClusterIP** used for backend (internal-only access)
-- **NodePort** used only where external access is needed (frontend)
+We keep frontend, backend, and database separate so things stay organized (like separate rooms in a house).
 
----
-
-## 📊 Stateless vs Stateful
-
-| Component | Type | Reason |
-|-----------|------|--------|
-| Frontend | Stateless | No local data, horizontally scalable |
-| Backend | Stateless | No local data, horizontally scalable |
-| Database | Stateful | Persistent storage, externalized to MongoDB Atlas |
+```bash
+kubectl apply -f namespaces/namespaces.yaml
+```
 
 ---
 
-## ✅ Key Learnings
+## 🛠️ Step 6 — Set Up Storage (StorageClass + PV)
 
-- Deploying a multi-tier app with proper namespace isolation
-- Managing sensitive data using Kubernetes Secrets
-- Difference between ClusterIP and NodePort services
-- Setting up a local Kubernetes cluster using KIND for PoC before scaling to EKS
-- Real-world DevOps workflow for a fintech-style SaaS platform
+```bash
+kubectl apply -f storage/storageclass.yaml
+kubectl apply -f storage/mongo-pv.yaml
+```
 
----
-
-## 👤 Author
-
-**nasir** — DevOps Engineer  
-📎 Project inspired by real-world startup infrastructure practices
+> ℹ️ You do **not** need `mongo-pvc.yaml` if you're using a StatefulSet — the StatefulSet creates its own PVC automatically via `volumeClaimTemplates`.
 
 ---
 
-## 📄 License
+## 🛠️ Step 7 — Create MongoDB Secret
 
-This project is for educational purposes as part of a DevOps learning path (Miseacademy).
+Kubernetes Secrets keep your DB username/password safe (not written in plain YAML):
+
+```bash
+kubectl create secret generic mongo-secret \
+  --namespace=database \
+  --from-literal=MONGO_INITDB_ROOT_USERNAME=admin \
+  --from-literal=MONGO_INITDB_ROOT_PASSWORD=securepass
+```
+
+---
+
+## 🛠️ Step 8 — Deploy MongoDB (Headless Service + StatefulSet)
+
+```bash
+kubectl apply -f database/service.yaml
+kubectl apply -f database/statefulset.yaml
+```
+
+Wait until the pod is running:
+
+```bash
+kubectl get pods -n database -w
+```
+
+You should see a pod named `mongo-0` (not a random name — that's the "stable identity" a StatefulSet gives you).
+
+---
+
+## 🛠️ Step 9 — Run the Init Job (Turn the Key 🔑)
+
+This actually activates the MongoDB replica set:
+
+```bash
+kubectl apply -f database/mongo-init-job.yaml
+kubectl logs job/mongo-init -n database
+```
+
+You should see: `✅ Replica set initiated!`
+
+> 🔧 **If you ever need to change the Init Job:** Jobs are meant to run once, so Kubernetes won't let you edit them directly. Instead:
+> ```bash
+> kubectl delete job mongo-init -n database
+> kubectl apply -f database/mongo-init-job.yaml
+> ```
+> or in one command:
+> ```bash
+> kubectl replace --force -f database/mongo-init-job.yaml
+> ```
+
+---
+
+## 🛠️ Step 10 — Deploy Backend
+
+```bash
+kubectl apply -f backend/deployment.yaml
+kubectl apply -f backend/service.yaml
+```
+
+The backend connects to MongoDB using this connection string (stored in `.env` / Secret):
+
+```
+MONGO_URI=mongodb://admin:securepass@mongo-service.database.svc.cluster.local:27017/?authSource=admin&replicaSet=rs0
+```
+
+---
+
+## 🛠️ Step 11 — Deploy Frontend
+
+```bash
+kubectl apply -f frontend/deployment.yaml
+kubectl apply -f frontend/service.yaml
+```
+
+---
+
+## ✅ Step 12 — Access the App
+
+Since we mapped port `30007` in our Kind config, open your browser at:
+
+```
+http://<EC2-Public-IP>:30007
+```
+
+---
+
+## 🔍 Useful Commands (Debugging & Maintenance)
+
+**Check what's inside MongoDB's storage folder:**
+```bash
+kubectl exec -it mongo-0 -n database -- bash
+ls -la /data/db
+exit
+```
+- Empty folder (`.` and `..` only) → Mongo will initialize fresh.
+- Files like `WiredTiger`, `mongod.lock`, `journal/` present → Mongo already has data, and it will skip creating a new root user.
+
+**Completely reset the database (careful — deletes everything!):**
+```bash
+kubectl delete statefulset mongo -n database
+kubectl delete pvc -n database --all
+```
+Then on EC2:
+```bash
+sudo rm -rf /mnt/kind-storage/mongo/*
+```
+
+---
+
+## 📌 Key Takeaways
+
+- ✅ Frontend & Backend → **Deployments** (stateless, easily scalable).
+- ✅ MongoDB → **StatefulSet** (needs identity + persistent storage).
+- ✅ Headless Service gives MongoDB a stable, predictable DNS name.
+- ✅ PVC + StatefulSet together make sure your data survives pod restarts.
+- ✅ Init Job is what actually activates the MongoDB replica set — without it, Mongo runs but isn't fully configured.
+
+---
+
+## 🏁 Conclusion
+
+This project simulates a real startup DevOps workflow: provisioning infrastructure, deploying a multi-tier app, organizing it with namespaces, and making sure the database survives crashes and restarts using Kubernetes' native storage tools. It's a solid foundation you can later extend with CI/CD, monitoring, and moving from Kind → EKS for real production use.
+
+---
+
+**Best regards,**
+**nasirbloch323**
