@@ -1,62 +1,48 @@
-# 🚀 Three-Tier MERN App on Kubernetes (Kind Cluster) with HPA & VPA
+# 🚀 Three-Tier MERN Application on Kubernetes (Kind Cluster) with Ingress Controller
 
-> **Simple, Student-Friendly Guide** | Deploy a full MERN stack on Kubernetes with auto-scaling — perfect for learning DevOps!
-
----
-
-## 📖 What is this Project?
-
-This project teaches you how to deploy a **3-tier MERN application** (MongoDB + Express + React + Node.js) on a **Kubernetes Kind cluster** running on **AWS EC2**.
-
-You will learn:
-- ✅ How to set up a local Kubernetes cluster using **Kind**
-- ✅ How to deploy **frontend**, **backend**, and **database** separately
-- ✅ How to use **HPA** (Horizontal Pod Autoscaler) to handle traffic spikes
-- ✅ How to use **VPA** (Vertical Pod Autoscaler) to right-size resources
-- ✅ How to keep **MongoDB data safe** using Persistent Storage
+A production-ready, scalable, and cost-efficient three-tier MERN stack application deployed on a **Kubernetes Kind cluster** running on **AWS EC2**.
 
 ---
 
-## 🎯 Real-World Example
-
-Imagine a **fintech startup** (like early PayPal or Stripe) that needs:
-- 🟢 **99.9% uptime** — customers can't afford downtime
-- 🟢 **Handle traffic spikes** — salary day = 10x more users
-- 🟢 **Save money** — startup budget is tight
-- 🟢 **Keep financial data safe** — data must never be lost
-
-This project shows exactly how DevOps engineers solve these problems!
-
----
-
-## 🏗️ Architecture Overview
+## 📋 Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        AWS EC2 Instance                     │
-│  ┌─────────────────────────────────────────────────────┐  │
-│  │              Kubernetes (Kind Cluster)                │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │  │
-│  │  │  Frontend   │  │   Backend   │  │  Database   │  │  │
-│  │  │  (React)    │  │  (Node.js)  │  │  (MongoDB)  │  │  │
-│  │  │  Stateless  │  │  Stateless  │  │   Stateful  │  │  │
-│  │  │  HPA ✅     │  │  HPA+VPA ✅ │  │   VPA ✅    │  │  │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  │  │
-│  │                                                      │  │
-│  │  ┌──────────────────────────────────────────────┐   │  │
-│  │  │     Persistent Volume (MongoDB Data)        │   │  │
-│  │  │     /mnt/kind-storage/mongo                  │   │  │
-│  │  └──────────────────────────────────────────────┘   │  │
-│  └─────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                         🌐 Internet                              │
+└──────────────────────┬────────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              🛡️ Ingress Controller (NGINX)                       │
+│         Routes: / → Frontend  |  /api → Backend                 │
+└──────────────────────┬────────────────────────────────────────┘
+                       │
+        ┌──────────────┼──────────────┐
+        ▼              ▼              ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│  🎨 Frontend │ │  ⚙️ Backend   │ │  🗄️ Database  │
+│   (React)    │ │ (Node.js API) │ │   (MongoDB)   │
+│  Namespace   │ │  Namespace    │ │   Namespace   │
+│  2 Replicas  │ │  2 Replicas   │ │  StatefulSet  │
+│     HPA      │ │     HPA       │ │     PVC       │
+└──────────────┘ └──────────────┘ └──────────────┘
 ```
 
-### Quick Rule of Thumb:
-| Layer | Type | Autoscaler | Why? |
-|-------|------|-----------|------|
-| **Frontend** | Stateless | **HPA** | More users = more pods |
-| **Backend** | Stateless | **HPA + VPA** | Scale pods + right-size CPU/RAM |
-| **Database** | Stateful | **VPA only** | Can't just add random pods |
+---
+
+## 🎯 Features
+
+| Feature | Description |
+|---------|-------------|
+| **🏗️ Three-Tier Architecture** | Frontend (React), Backend (Node.js + Express), Database (MongoDB) |
+| **📦 Namespaces** | Isolated namespaces for frontend, backend, and database |
+| **💾 Persistent Storage** | StatefulSet with PVC for MongoDB data durability |
+| **📈 Auto Scaling** | HPA (Horizontal) + VPA (Vertical) for all tiers |
+| **⚖️ Resource Management** | ResourceQuotas and LimitRanges per namespace |
+| **🔒 Security** | Secrets, ConfigMaps, and RBAC policies |
+| **🌐 Ingress Routing** | Single entry point with NGINX Ingress Controller |
+| **🔍 Health Checks** | Liveness and Readiness probes on all pods |
+| **☁️ Cloud Ready** | Easily migratable from Kind to EKS/GKE/AKS |
 
 ---
 
@@ -64,66 +50,73 @@ This project shows exactly how DevOps engineers solve these problems!
 
 ```
 three-tier-k8s/
-├── k8s-manifests/
-│   ├── namespaces/           # Separate spaces for each layer
-│   │   ├── frontend.yaml
-│   │   ├── backend.yaml
-│   │   └── database.yaml
-│   │
-│   ├── storage/              # Where MongoDB data lives forever
-│   │   ├── storageclass.yaml
-│   │   ├── mongo-pv.yaml
-│   │   └── mongo-pvc.yaml
-│   │
-│   ├── database/             # MongoDB (StatefulSet)
-│   │   ├── statefulset.yaml
-│   │   ├── service.yaml
-│   │   └── mongo-init-job.yaml
-│   │
-│   ├── backend/              # Node.js API (Deployment)
-│   │   ├── deployment.yaml
-│   │   └── service.yaml
-│   │
-│   ├── frontend/             # React App (Deployment)
-│   │   ├── deployment.yaml
-│   │   └── service.yaml
-│   │
-│   ├── autoscaling/          # HPA & VPA configs
-│   │   ├── frontend-hpa.yaml
-│   │   ├── frontend-vpa.yaml
-│   │   ├── backend-hpa.yaml
-│   │   ├── backend-vpa.yaml
-│   │   └── database-vpa.yaml
-│   │
-│   ├── resource-quotas/      # Prevent one app from eating all resources
-│   │   ├── frontend-quota.yaml
-│   │   ├── backend-quota.yaml
-│   │   └── database-quota.yaml
-│   │
-│   └── limit-ranges/         # Default CPU/RAM limits per pod
-│       ├── frontend-limits.yaml
-│       ├── backend-limits.yaml
-│       └── database-limits.yaml
-│
-└── README.md                 # You are here! 📍
+├── README.md
+├── kind-config.yaml
+├── backend/
+│   ├── Dockerfile
+│   ├── package.json
+│   └── server.js
+├── frontend/
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── public/
+│   │   └── index.html
+│   └── src/
+│       ├── App.js
+│       ├── index.js
+│       └── App.css
+└── k8s-manifests/
+    ├── namespaces/
+    │   ├── frontend.yaml
+    │   ├── backend.yaml
+    │   └── database.yaml
+    ├── storage/
+    │   ├── storageclass.yaml
+    │   ├── mongo-pv.yaml
+    │   └── mongo-pvc.yaml
+    ├── database/
+    │   ├── secret.yaml
+    │   ├── statefulset.yaml
+    │   └── service.yaml
+    ├── backend/
+    │   ├── configmap.yaml
+    │   ├── deployment.yaml
+    │   └── service.yaml
+    ├── frontend/
+    │   ├── configmap.yaml
+    │   ├── deployment.yaml
+    │   └── service.yaml
+    ├── ingress/
+    │   └── ingress.yaml
+    ├── autoscaling/
+    │   ├── frontend-hpa.yaml
+    │   ├── frontend-vpa.yaml
+    │   ├── backend-hpa.yaml
+    │   ├── backend-vpa.yaml
+    │   ├── database-hpa.yaml
+    │   └── database-vpa.yaml
+    ├── resource-quotas/
+    │   ├── frontend-quota.yaml
+    │   ├── backend-quota.yaml
+    │   └── database-quota.yaml
+    └── limit-ranges/
+        ├── frontend-limits.yaml
+        ├── backend-limits.yaml
+        └── database-limits.yaml
 ```
 
 ---
 
-## 🛠️ Prerequisites
+## 🚀 Quick Start
 
-Before starting, you need:
+### Prerequisites
 
-1. **AWS EC2 Instance** (Ubuntu 22.04, t3.medium or bigger)
-2. **Docker** installed
-3. **Kind** (Kubernetes in Docker) installed
-4. **kubectl** installed
+- AWS EC2 Instance (Ubuntu 22.04+, t3.large or higher recommended)
+- Docker installed
+- Kind installed
+- kubectl installed
 
----
-
-## ⚙️ Step 1: Setup EC2 + Install Docker
-
-SSH into your EC2 instance and run:
+### 1️⃣ Install Docker & Kind on EC2
 
 ```bash
 # Update system
@@ -135,808 +128,239 @@ sudo systemctl start docker
 sudo systemctl enable docker
 sudo usermod -aG docker $USER
 newgrp docker
-
-# Check Docker
 docker --version
-```
 
----
-
-## ⚙️ Step 2: Install kubectl & Kind
-
-```bash
 # Install kubectl
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 chmod +x kubectl
-sudo mv kubectl /usr/local/bin/kubectl
+sudo mv kubectl /usr/local/bin/
 kubectl version --client
 
 # Install Kind
 curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
 chmod +x ./kind
-sudo mv ./kind /usr/local/bin/kind
+sudo mv ./kind /usr/local/bin/
 kind version
 ```
 
----
-
-## ⚙️ Step 3: Create Storage Directory on EC2
-
-MongoDB needs a folder on the host machine to save data permanently:
+### 2️⃣ Prepare Storage Directory
 
 ```bash
 sudo mkdir -p /mnt/kind-storage/mongo
 sudo chmod 777 /mnt/kind-storage/mongo
 ```
 
----
-
-## ⚙️ Step 4: Create Kind Cluster
-
-Create a file called `config.yml`:
-
-```yaml
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-  # Control Plane (brain of the cluster)
-  - role: control-plane
-    image: kindest/node:v1.28.0
-    extraPortMappings:
-      - containerPort: 80      # HTTP
-        hostPort: 80
-        protocol: TCP
-      - containerPort: 443     # HTTPS
-        hostPort: 443
-        protocol: TCP
-      - containerPort: 30007   # NodePort for frontend
-        hostPort: 30007
-        protocol: TCP
-    extraMounts:
-      - hostPath: /mnt/kind-storage/mongo
-        containerPath: /data/mongo
-
-  # Worker Node 1
-  - role: worker
-    image: kindest/node:v1.28.0
-    extraMounts:
-      - hostPath: /mnt/kind-storage/mongo
-        containerPath: /data/mongo
-
-  # Worker Node 2
-  - role: worker
-    image: kindest/node:v1.28.0
-    extraMounts:
-      - hostPath: /mnt/kind-storage/mongo
-        containerPath: /data/mongo
-```
-
-Now create the cluster:
+### 3️⃣ Create Kind Cluster
 
 ```bash
-kind create cluster --name three-tier-cluster --config config.yml
+kind create cluster --name three-tier-cluster --config kind-config.yaml
 ```
 
----
-
-## ⚙️ Step 5: Deploy Everything (Follow This Order!)
-
-> ⚠️ **Important:** Apply files in this exact order!
-
-### 1️⃣ Namespaces (Create separate rooms for each app)
-
-```yaml
-# namespaces/frontend.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: frontend
-
----
-# namespaces/backend.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: backend
-
----
-# namespaces/database.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: database
-```
+### 4️⃣ Install NGINX Ingress Controller
 
 ```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+# Wait for controller
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=120s
+```
+
+### 5️⃣ Deploy Application (Follow Order!)
+
+```bash
+# 1. Namespaces
 kubectl apply -f k8s-manifests/namespaces/
-```
 
----
-
-### 2️⃣ Storage (So MongoDB data survives pod restarts)
-
-```yaml
-# storage/storageclass.yaml
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: standard-storage
-provisioner: kubernetes.io/no-provisioner
-volumeBindingMode: WaitForFirstConsumer
-
----
-# storage/mongo-pv.yaml
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: mongo-pv
-spec:
-  capacity:
-    storage: 1Gi
-  accessModes:
-    - ReadWriteOnce
-  hostPath:
-    path: "/data/mongo"
-  storageClassName: standard-storage
-
----
-# storage/mongo-pvc.yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mongo-pvc
-  namespace: database
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
-  storageClassName: standard-storage
-```
-
-```bash
+# 2. Storage
 kubectl apply -f k8s-manifests/storage/
-```
 
----
-
-### 3️⃣ Secrets (Hide passwords safely)
-
-```yaml
-# secret.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: mongo-secret
-  namespace: database
-type: Opaque
-stringData:
-  MONGO_INITDB_ROOT_USERNAME: admin
-  MONGO_INITDB_ROOT_PASSWORD: securepass
-```
-
-```bash
-kubectl apply -f secret.yaml
-```
-
----
-
-### 4️⃣ MongoDB (StatefulSet for persistent identity)
-
-```yaml
-# database/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: mongo-service
-  namespace: database
-spec:
-  clusterIP: None  # Headless service for stable DNS
-  selector:
-    app: mongo
-  ports:
-    - protocol: TCP
-      port: 27017
-      targetPort: 27017
-
----
-# database/statefulset.yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: mongo
-  namespace: database
-spec:
-  serviceName: mongo-service
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mongo
-  template:
-    metadata:
-      labels:
-        app: mongo
-    spec:
-      containers:
-        - name: mongo
-          image: mongo:6
-          command: ["mongod"]
-          args: ["--replSet", "rs0", "--bind_ip_all"]
-          ports:
-            - containerPort: 27017
-          env:
-            - name: MONGO_INITDB_ROOT_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: mongo-secret
-                  key: MONGO_INITDB_ROOT_USERNAME
-            - name: MONGO_INITDB_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mongo-secret
-                  key: MONGO_INITDB_ROOT_PASSWORD
-          volumeMounts:
-            - name: mongo-storage
-              mountPath: /data/db
-          resources:
-            requests:
-              cpu: "500m"
-              memory: "512Mi"
-            limits:
-              cpu: "1"
-              memory: "1Gi"
-      volumes:
-        - name: mongo-storage
-          persistentVolumeClaim:
-            claimName: mongo-pvc
-```
-
-```bash
+# 3. Database (StatefulSet)
 kubectl apply -f k8s-manifests/database/
-```
 
----
-
-### 5️⃣ MongoDB Init Job (Initialize replica set)
-
-```yaml
-# database/mongo-init-job.yaml
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: mongo-init
-  namespace: database
-spec:
-  backoffLimit: 5
-  template:
-    spec:
-      restartPolicy: OnFailure
-      containers:
-        - name: mongo-init
-          image: mongo:6
-          command:
-            - sh
-            - -c
-            - |
-              echo "⏳ Waiting for MongoDB to be ready..."
-              until mongosh --host mongo-0.mongo-service.database.svc.cluster.local:27017 --eval "db.adminCommand('ping')" > /dev/null 2>&1; do
-                echo "MongoDB not ready, retrying in 3s..."
-                sleep 3
-              done
-
-              echo "🚀 Initiating replica set..."
-              mongosh --host mongo-0.mongo-service.database.svc.cluster.local:27017                 -u "$MONGO_INITDB_ROOT_USERNAME"                 -p "$MONGO_INITDB_ROOT_PASSWORD"                 --authenticationDatabase admin                 --eval 'rs.initiate({
-                  _id: "rs0",
-                  members: [{ _id: 0, host: "mongo-0.mongo-service.database.svc.cluster.local:27017" }]
-                })'
-
-              echo "✅ MongoDB initialization complete!"
-          env:
-            - name: MONGO_INITDB_ROOT_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: mongo-secret
-                  key: MONGO_INITDB_ROOT_USERNAME
-            - name: MONGO_INITDB_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mongo-secret
-                  key: MONGO_INITDB_ROOT_PASSWORD
-```
-
-```bash
-kubectl apply -f k8s-manifests/database/mongo-init-job.yaml
-```
-
----
-
-### 6️⃣ Backend (Node.js API)
-
-```yaml
-# backend/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: backend-deployment
-  namespace: backend
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: backend
-  template:
-    metadata:
-      labels:
-        app: backend
-    spec:
-      containers:
-        - name: backend
-          image: misacademy/backend:v3
-          ports:
-            - containerPort: 5000
-          resources:
-            requests:
-              cpu: "200m"
-              memory: "256Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-          livenessProbe:
-            httpGet:
-              path: /api/items
-              port: 5000
-            initialDelaySeconds: 15
-            periodSeconds: 20
-            timeoutSeconds: 5
-            failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /api/items
-              port: 5000
-            initialDelaySeconds: 10
-            periodSeconds: 15
-            timeoutSeconds: 5
-            failureThreshold: 3
-          envFrom:
-            - secretRef:
-                name: mongo-secret
-
----
-# backend/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: backend-service
-  namespace: backend
-spec:
-  type: ClusterIP
-  selector:
-    app: backend
-  ports:
-    - protocol: TCP
-      port: 5000
-      targetPort: 5000
-```
-
-```bash
+# 4. Backend
 kubectl apply -f k8s-manifests/backend/
-```
 
----
-
-### 7️⃣ Frontend (React App)
-
-```yaml
-# frontend/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: frontend-deployment
-  namespace: frontend
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: frontend
-  template:
-    metadata:
-      labels:
-        app: frontend
-    spec:
-      containers:
-        - name: frontend
-          image: misacademy/frontend:v3
-          ports:
-            - containerPort: 3000
-          resources:
-            requests:
-              cpu: "200m"
-              memory: "256Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 3000
-            initialDelaySeconds: 10
-            periodSeconds: 15
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 3000
-            initialDelaySeconds: 5
-            periodSeconds: 10
-
----
-# frontend/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: frontend-service
-  namespace: frontend
-spec:
-  type: NodePort
-  selector:
-    app: frontend
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 3000
-      nodePort: 30007
-```
-
-```bash
+# 5. Frontend
 kubectl apply -f k8s-manifests/frontend/
-```
 
----
+# 6. Ingress
+kubectl apply -f k8s-manifests/ingress/
 
-## 📈 Step 6: Setup Autoscaling (HPA & VPA)
-
-### What is HPA? 🤔
-**HPA** = **Horizontal Pod Autoscaler**
-- Adds more pods when CPU is high
-- Removes pods when CPU is low
-- Think: "More workers in a restaurant when it's busy"
-
-### What is VPA? 🤔
-**VPA** = **Vertical Pod Autoscaler**
-- Gives each pod more CPU/RAM if needed
-- Takes away resources if pod is idle
-- Think: "Giving a worker a bigger desk when they need it"
-
----
-
-### 🟢 Frontend HPA
-
-```yaml
-# autoscaling/frontend-hpa.yaml
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: frontend-hpa
-  namespace: frontend
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: frontend-deployment
-  minReplicas: 2
-  maxReplicas: 5
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 0
-      policies:
-        - type: Percent
-          value: 100
-          periodSeconds: 30
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Percent
-          value: 25
-          periodSeconds: 60
-```
-
----
-
-### 🟢 Backend HPA
-
-```yaml
-# autoscaling/backend-hpa.yaml
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: backend-hpa
-  namespace: backend
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: backend-deployment
-  minReplicas: 2
-  maxReplicas: 5
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 0
-      policies:
-        - type: Percent
-          value: 100
-          periodSeconds: 30
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Percent
-          value: 25
-          periodSeconds: 60
-```
-
----
-
-### 🟢 Backend VPA
-
-```yaml
-# autoscaling/backend-vpa.yaml
-apiVersion: autoscaling.k8s.io/v1
-kind: VerticalPodAutoscaler
-metadata:
-  name: backend-vpa
-  namespace: backend
-spec:
-  targetRef:
-    apiVersion: "apps/v1"
-    kind: Deployment
-    name: backend-deployment
-  updatePolicy:
-    updateMode: "Auto"
-  resourcePolicy:
-    containerPolicies:
-      - containerName: backend
-        minAllowed:
-          cpu: "200m"
-          memory: "256Mi"
-        maxAllowed:
-          cpu: "2"
-          memory: "2Gi"
-        controlledResources: ["cpu", "memory"]
-        controlledValues: "RequestsAndLimits"
-```
-
----
-
-### 🟢 Database VPA (Stateful workloads need VPA, NOT HPA!)
-
-```yaml
-# autoscaling/database-vpa.yaml
-apiVersion: autoscaling.k8s.io/v1
-kind: VerticalPodAutoscaler
-metadata:
-  name: database-vpa
-  namespace: database
-spec:
-  targetRef:
-    apiVersion: "apps/v1"
-    kind: StatefulSet
-    name: mongo
-  updatePolicy:
-    updateMode: "Initial"  # Safer for databases
-  resourcePolicy:
-    containerPolicies:
-      - containerName: mongo
-        minAllowed:
-          cpu: "500m"
-          memory: "512Mi"
-        maxAllowed:
-          cpu: "4"
-          memory: "4Gi"
-        controlledResources: ["cpu", "memory"]
-        controlledValues: "RequestsAndLimits"
-```
-
-> ⚠️ **Important:** We use `updateMode: "Initial"` for the database so it only sets resources when the pod starts — no mid-life restarts that could crash MongoDB!
-
-Apply all autoscaling configs:
-
-```bash
+# 7. Autoscaling (HPA + VPA)
 kubectl apply -f k8s-manifests/autoscaling/
+
+# 8. Resource Quotas & Limits
+kubectl apply -f k8s-manifests/resource-quotas/
+kubectl apply -f k8s-manifests/limit-ranges/
 ```
 
----
+### 6️⃣ Initialize MongoDB Replica Set
 
-## 🔍 Step 7: Check Everything is Working
-
-### Check all pods are running:
 ```bash
-kubectl get pods --all-namespaces
-```
-
-### Check HPA status:
-```bash
-kubectl get hpa --all-namespaces
-kubectl describe hpa frontend-hpa -n frontend
-```
-
-### Check VPA status:
-```bash
-kubectl get vpa --all-namespaces
-kubectl describe vpa backend-vpa -n backend
-```
-
-### Check MongoDB is ready:
-```bash
+# Exec into MongoDB pod
 kubectl exec -it mongo-0 -n database -- mongosh
+
+# Inside mongosh, run:
+rs.initiate({
+  _id: "rs0",
+  members: [{_id: 0, host: "mongo-0.mongo-service.database.svc.cluster.local:27017"}]
+})
+
+# Check status
+rs.status()
+# Look for: "stateStr": "PRIMARY"
 ```
 
-Inside mongosh, run:
-```javascript
-rs.status()  // Should show "stateStr": "PRIMARY"
-```
+### 7️⃣ Access Your Application
 
-### Check services:
 ```bash
-kubectl get svc --all-namespaces
-```
-
-### Access the frontend:
-Open your browser and go to:
-```
-http://<YOUR_EC2_PUBLIC_IP>:30007
+# Get EC2 Public IP
+EC2_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+echo "Access your app at: http://${EC2_IP}.nip.io/"
+echo "API at: http://${EC2_IP}.nip.io/api/items"
 ```
 
 ---
 
-## 🧪 Step 8: Test Autoscaling (Load Test)
+## 🔧 Useful Commands
 
-Install a load testing tool:
+### Check All Resources
 ```bash
-sudo apt install -y apache2-utils
+kubectl get all --all-namespaces
 ```
 
-Run a load test on the backend:
+### Check Pods Status
 ```bash
-ab -n 10000 -c 100 http://<YOUR_EC2_PUBLIC_IP>:30007/api/items
+kubectl get pods -n frontend
+kubectl get pods -n backend
+kubectl get pods -n database
 ```
 
-Watch HPA scale up in real-time:
+### Check Logs
 ```bash
-watch kubectl get hpa -n backend
+kubectl logs -f deployment/frontend-deployment -n frontend
+kubectl logs -f deployment/backend-deployment -n backend
+kubectl logs -f statefulset/mongo -n database
 ```
 
-You should see the backend pods increase from 2 to 5!
+### Port Forward for Local Testing
+```bash
+# Frontend
+kubectl port-forward svc/frontend-service 3000:80 -n frontend
+
+# Backend
+kubectl port-forward svc/backend-service 5000:5000 -n backend
+
+# MongoDB
+kubectl port-forward svc/mongo-service 27017:27017 -n database
+```
+
+### Scale Manually
+```bash
+kubectl scale deployment frontend-deployment --replicas=5 -n frontend
+kubectl scale deployment backend-deployment --replicas=5 -n backend
+```
+
+### Check HPA Status
+```bash
+kubectl get hpa -n frontend
+kubectl get hpa -n backend
+kubectl get hpa -n database
+```
+
+### Patch Ingress Controller to NodePort (if needed)
+```bash
+kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{"spec":{"type":"NodePort"}}'
+```
 
 ---
 
-## 🧹 Cleanup (When You're Done)
+## 🌐 Ingress Routing
+
+| Path | Service | Description |
+|------|---------|-------------|
+| `/` | frontend-service | React Frontend |
+| `/api` | backend-service | Node.js API |
+
+---
+
+## 📊 Resource Configuration
+
+### Resource Quotas per Namespace
+
+| Namespace | CPU Request | Memory Request | CPU Limit | Memory Limit |
+|-----------|-------------|----------------|-----------|--------------|
+| frontend | 1 CPU | 1 Gi | 2 CPU | 2 Gi |
+| backend | 1 CPU | 1 Gi | 2 CPU | 2 Gi |
+| database | 500m CPU | 512 Mi | 1 CPU | 1 Gi |
+
+### HPA Configuration
+
+| Tier | Min Replicas | Max Replicas | Target CPU |
+|------|--------------|--------------|------------|
+| Frontend | 2 | 5 | 70% |
+| Backend | 2 | 5 | 70% |
+| Database | 1 | 3 | 60% |
+
+---
+
+## 🔒 Security Best Practices
+
+- ✅ **Namespaces** isolate frontend, backend, and database
+- ✅ **Secrets** store MongoDB credentials securely
+- ✅ **ConfigMaps** manage non-sensitive configuration
+- ✅ **ResourceQuotas** prevent resource hogging
+- ✅ **LimitRanges** enforce default resource limits
+- ✅ **Network Policies** can be added for inter-namespace communication control
+
+---
+
+## 🚀 Migration to Production (EKS)
+
+This architecture is designed to be **migration-ready**:
+
+1. **Replace Kind with EKS** → Use `eksctl` or AWS Console
+2. **Replace hostPath PV** → Use EBS CSI Driver or EFS
+3. **Replace NodePort** → Use AWS Load Balancer Controller
+4. **Add TLS** → Use cert-manager with Let's Encrypt
+5. **Add Monitoring** → Deploy Prometheus + Grafana
+6. **Add Logging** → Deploy Fluentd + Elasticsearch + Kibana
+
+---
+
+## 🧹 Cleanup
 
 ```bash
-# Delete the entire cluster
+# Delete application
+kubectl delete namespace frontend backend database
+
+# Delete cluster
 kind delete cluster --name three-tier-cluster
 
-# Or delete everything manually
-kubectl delete -f k8s-manifests/autoscaling/
-kubectl delete -f k8s-manifests/frontend/
-kubectl delete -f k8s-manifests/backend/
-kubectl delete -f k8s-manifests/database/
-kubectl delete -f k8s-manifests/storage/
-kubectl delete -f k8s-manifests/namespaces/
-
-# Clean host storage
-sudo rm -rf /mnt/kind-storage/mongo/*
+# Clean storage
+sudo rm -rf /mnt/kind-storage/mongo
 ```
 
 ---
 
-## 🐛 Common Errors & Fixes
+## 📚 References
 
-### ❌ Error: "MongoDB not initializing"
-**Fix:**
-```bash
-# Check if data already exists
-kubectl exec -it mongo-0 -n database -- ls -la /data/db
-
-# If files exist, delete PVC and recreate
-kubectl delete pvc mongo-pvc -n database
-kubectl delete pv mongo-pv
-sudo rm -rf /mnt/kind-storage/mongo/*
-kubectl apply -f k8s-manifests/storage/
-kubectl apply -f k8s-manifests/database/
-```
-
-### ❌ Error: "HPA not scaling"
-**Fix:**
-```bash
-# Check metrics server is running
-kubectl get pods -n kube-system | grep metrics-server
-
-# If not running, install it:
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-```
-
-### ❌ Error: "VPA not working"
-**Fix:**
-```bash
-# VPA needs to be installed separately on Kind
-kubectl apply -f https://github.com/kubernetes/autoscaler/releases/latest/download/vertical-pod-autoscaler.yaml
-```
-
-### ❌ Error: "ImagePullBackOff"
-**Fix:**
-```bash
-# Check if image exists
-docker pull misacademy/backend:v3
-docker pull misacademy/frontend:v3
-
-# Or use your own images
-```
-
----
-
-## 📚 What You Learned
-
-| Concept | Simple Explanation |
-|---------|-------------------|
-| **Namespace** | Separate rooms for different apps |
-| **Deployment** | Blueprint for running stateless apps |
-| **StatefulSet** | Blueprint for running stateful apps (like databases) |
-| **Service** | How pods talk to each other |
-| **PV/PVC** | Hard disk for your pods |
-| **Secret** | Safe place for passwords |
-| **HPA** | Add/remove pods based on load |
-| **VPA** | Give/take CPU & RAM per pod |
-| **Liveness Probe** | "Is the app alive?" check |
-| **Readiness Probe** | "Is the app ready to receive traffic?" check |
-
----
-
-## 🎓 For Students: Key Interview Questions
-
-1. **Why use StatefulSet for MongoDB but Deployment for frontend/backend?**
-   - StatefulSet gives each pod a stable name and persistent storage. MongoDB needs this because data must survive restarts. Frontend/backend don't care which pod handles the request.
-
-2. **Why not use HPA on the database?**
-   - Databases need careful coordination when adding replicas. You can't just add a random MongoDB pod — it needs to join the replica set properly. HPA is for stateless apps only.
-
-3. **What's the difference between HPA and VPA?**
-   - HPA = more pods (horizontal). VPA = bigger pods (vertical).
-
-4. **Why use both HPA and VPA on the backend?**
-   - HPA handles traffic spikes by adding pods. VPA ensures each pod has enough CPU/RAM to perform well.
-
-5. **What happens if a MongoDB pod crashes?**
-   - Kubernetes restarts it. Because we used PVC, the data is saved on the host disk and re-attached to the new pod.
-
----
-
-## 🙏 Credits
-
-- Built for students learning DevOps & Kubernetes
-- Inspired by real-world fintech startup architecture
-- Images: `misacademy/frontend:v3` and `misacademy/backend:v3`
+- [Kind Documentation](https://kind.sigs.k8s.io/)
+- [Kubernetes Documentation](https://kubernetes.io/docs/)
+- [NGINX Ingress Controller](https://kubernetes.github.io/ingress-nginx/)
+- [MongoDB Kubernetes Operator](https://github.com/mongodb/mongodb-kubernetes-operator)
 
 ---
 
 ## 📄 License
 
-MIT License — Free for learning and projects!
+MIT License - Free for personal and commercial use.
 
 ---
 
-> 💡 **Pro Tip:** Once you master this on Kind, you can easily move to **Amazon EKS** for production. The YAML files are 90% the same!
+## 👨‍💻 Author
 
-**Happy Learning! 🚀**
+**DevOps Engineer** | Building scalable, cloud-native applications 🚀
